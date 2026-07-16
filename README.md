@@ -4,6 +4,8 @@
 
 Point a phone at an object or a room, run it through a splatting pipeline, and walk through the result in any browser — no install, no plugin, nothing uploaded to a server.
 
+**🔗 Live demo: [miragebysd.vercel.app](https://miragebysd.vercel.app/)** — open a sample scene and orbit, or drag & drop your own `.ply`/`.splat` capture.
+
 > 🎬 *Demo GIF goes here — record a 20–30s fly-through (see [Recording a demo](#recording-a-demo)).*
 
 ## What it does
