@@ -1,0 +1,22 @@
+{
+  "name": "mirage",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browser-based 3D Gaussian Splatting viewer — explore photorealistic captures of real objects and spaces in real time.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate:scenes": "node scripts/generate-scenes.mjs"
+  },
+  "dependencies": {
+    "@mkkellogg/gaussian-splats-3d": "0.4.7",
+    "heic-to": "1.5.2",
+    "jszip": "3.10.1",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
