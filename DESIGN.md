@@ -256,17 +256,23 @@ device-aware quality profiles (~3,400 lines of source).
       in the gallery — the proof-of-pitch scene.
 - [ ] Record the fly-through demo (use your own path recorder — great dogfooding story)
       and embed the GIF/MP4 in the README.
-- [ ] Move `test-sphere.ksplat` into `fixtures/` or delete it.
-- [ ] Vitest + CI: `urlState` round-trip, `cameraPath` interpolation endpoints/monotonic
-      time, `heicDetect`, crop AABB in/out cases.
+- [x] Move `test-sphere.ksplat` into `fixtures/` or delete it. *(Moved to `fixtures/`.)*
+- [x] Vitest + CI: `urlState` round-trip, `cameraPath` interpolation endpoints/monotonic
+      time, `heicDetect`, crop AABB in/out cases. *(Done — 32 tests across 5 files,
+      `npm test` wired into the CI workflow.)*
 
 ### Tier B — Depth (1–2 weeks)
-- [ ] **Perf HUD** (`?hud=1`): FPS, frame time, splat count, sort latency; publish a
-      small table (MacBook / mid-range Android) in the README.
+- [x] **Perf HUD** (`?hud=1`): FPS, frame time, splat count, sort latency; publish a
+      small table (MacBook / mid-range Android) in the README. *(Built — FPS,
+      frame-time median/p95, splat count, draw calls, JS heap; still to do: run it on
+      your hardware and publish the numbers table in the README. Sort latency isn't
+      exposed by the library's worker, so draw calls stand in for render pressure.)*
 - [ ] **Scene annotations**: click to pin a 3D label; store in the shareable URL. Turns
       the viewer into a communication tool (real-estate / museum story).
-- [ ] **IndexedDB scene library** — imported scenes persist across sessions instead of
-      being lost on reload.
+- [x] **IndexedDB scene library** — imported scenes persist across sessions instead of
+      being lost on reload. *(Done — dropped captures auto-save with a persistent
+      `#/lib/<id>` URL, a "Your library" gallery section, delete, and a graceful
+      session-only fallback when storage is blocked.)*
 - [ ] `.spz` / SOG-style compressed export (not just `.ksplat`) — shows awareness of the
       current ecosystem direction.
 - [ ] TypeScript for the pure modules (`urlState`, `cameraPath`, `crop`).

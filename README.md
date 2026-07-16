@@ -10,6 +10,7 @@ Point a phone at an object or a room, run it through a splatting pipeline, and w
 
 ## What it does
 
+- **Scroll-story landing page** — an Apple-style scroll-scrubbed image sequence (120 frames, canvas cover-fit) flies you into a particle nebula while the pitch fades through; works in portrait and landscape, streams keyframes-first, and collapses to a static hero under `prefers-reduced-motion`.
 - **Scene gallery** with bundled sample scenes that load progressively — splats appear while the file is still streaming.
 - **Drag & drop** any `.ply` / `.splat` / `.ksplat` / `.spz` capture onto the page and it renders instantly. Files are parsed entirely client-side; the privacy story is "your capture never leaves your machine."
 - **Smooth damped orbit / pan / zoom**, reset view, fullscreen, one-click PNG screenshots.
@@ -21,6 +22,8 @@ Point a phone at an object or a room, run it through a splatting pipeline, and w
 - **Scene cropping** — drag a 3D bounding box to cut floaters, watch the kept-splat count live, then re-export a tighter `.ksplat` or view the cropped result (base-colour / SH0 re-export).
 - **WebXR** — on a headset or WebXR-capable Android, a *View in VR/AR* button appears (capability-gated; hidden where unsupported) to step inside the scene.
 - **Quality controls** — spherical-harmonics degree (0/1/2), splat alpha-removal threshold, progressive loading — with device-aware presets (mobile gets the performance profile automatically).
+- **Persistent scene library** — every capture you drop in is saved to IndexedDB and gets its own `#/lib/<id>` URL, so your scenes are still there after a reload (with a "Your library" section in the gallery to reopen or remove them). Storage failures fall back gracefully to a session-only open.
+- **Perf diagnostics HUD** (`?hud=1`) — FPS, frame-time median/p95 over a rolling window, live splat count, WebGL draw calls, and JS heap where the browser exposes it.
 - **In-browser `.ply` → `.ksplat` conversion**: drop a raw training output, click convert, and get a compressed file that loads much faster next time.
 - **HEIC → JPG capture prep**: drop your iPhone photos (`.heic`/`.heif`) on the gallery to batch-convert them to `.jpg` and download a zip — the format COLMAP and most splatting trainers actually want. Runs locally via a lazily-loaded libheif WASM decoder.
 
@@ -62,6 +65,7 @@ Steps in **Mirage** (browser, no server): HEIC→JPG capture prep, the real-time
 ```bash
 npm install
 npm run dev          # http://localhost:5173
+npm test             # Vitest: URL state, camera paths, crop AABB, HEIC detection, perf stats
 ```
 
 `npm run build` produces a static `dist/` deployable anywhere (Vercel works zero-config; for GitHub Pages set `base` in `vite.config.js` to `'/<repo>/'`).
@@ -117,10 +121,12 @@ The *View in VR/AR* button only appears when the device reports a supported sess
 ```
 mirage/
   public/scenes/          sample .splat files (generated, ~6 MB total)
+  public/hero/            scroll-hero frame sequence (120 × webp)
   scripts/
     generate-scenes.mjs   procedural sample-scene generator
   src/
     main.js               bootstrap + hash routing, feature wiring
+    ui/scrollHero.js      scroll-scrubbed canvas image-sequence hero
     viewer.js             MirageViewer: load/dispose, quality, pose API, screenshots, WebXR
     gallery.js            scene cards, drag & drop, file ingest
     cameraPath.js         Catmull-Rom + slerp fly-through path + playback driver

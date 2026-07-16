@@ -90,6 +90,12 @@ export function runTour(steps, { onDone } = {}) {
       target = step.waitFor === false
         ? document.querySelector(step.selector)
         : await waitFor(step.selector);
+      // Anchors can sit far down the page (e.g. below the scroll hero) —
+      // bring them into view before measuring the spotlight rect.
+      if (target) {
+        target.scrollIntoView({ block: 'center', behavior: 'auto' });
+        await new Promise((r) => setTimeout(r, 30));
+      }
     }
     countEl.textContent = `${i + 1} / ${steps.length}`;
     titleEl.textContent = step.title;

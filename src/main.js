@@ -15,6 +15,9 @@ import { runTour, tourWasSeen } from './ui/tour.js';
 import { CropPanel } from './ui/cropPanel.js';
 import { cropSplats, downloadCroppedKSplat } from './crop.js';
 import { parseHash, buildHash, encodePose, decodePose } from './urlState.js';
+import { librarySupported, saveScene, getScene } from './sceneLibrary.js';
+import { RollingWindow } from './perfStats.js';
+import { PerfHud, perfHudEnabled } from './ui/perfHud.js';
 
 const app = document.getElementById('app');
 
@@ -68,6 +71,7 @@ let compareRefUrl = null;   // object URL of a user-picked reference photo
 let cropPanel = null;       // active crop tool
 let croppedUrl = null;      // object URL of a cropped scene being viewed
 let currentXRMode = 'None'; // 'None' | 'VR' | 'AR'
+let perfHud = null;         // ?hud=1 diagnostics overlay
 
 function teardownViewerPage() {
   cancelAnimationFrame(statsRaf);
@@ -87,6 +91,8 @@ function teardownViewerPage() {
   clearInterval(recTimer);
   recTimer = 0;
   hud = null;
+  perfHud?.destroy();
+  perfHud = null;
   if (mirage) {
     const m = mirage;
     mirage = null;
@@ -98,11 +104,23 @@ function teardownViewerPage() {
 function startStatsLoop() {
   let frames = 0;
   let last = performance.now();
+  let prevFrame = last;
+  const frameTimes = new RollingWindow(240);
   const tick = (now) => {
     frames++;
+    frameTimes.push(now - prevFrame);
+    prevFrame = now;
     if (now - last >= 500) {
       const fps = Math.round((frames * 1000) / (now - last));
-      hud?.setStats(fps, mirage?.getSplatCount() ?? 0);
+      const splats = mirage?.getSplatCount() ?? 0;
+      hud?.setStats(fps, splats);
+      perfHud?.update({
+        fps,
+        frameMedian: frameTimes.quantile(0.5),
+        frameP95: frameTimes.quantile(0.95),
+        splats,
+        rendererInfo: mirage?.renderer?.info,
+      });
       frames = 0;
       last = now;
     }
@@ -113,16 +131,29 @@ function startStatsLoop() {
 
 // ---------- Pages ----------
 
+let galleryHero = null;     // ScrollHero instance while the gallery is shown
+let tourObserver = null;    // arms first-visit tour when the gallery scrolls into view
+
+function teardownGalleryPage() {
+  galleryHero?.destroy();
+  galleryHero = null;
+  tourObserver?.disconnect();
+  tourObserver = null;
+}
+
 function showGallery() {
   teardownViewerPage();
+  teardownGalleryPage();
   document.title = 'Mirage — real-time Gaussian Splatting in the browser';
-  renderGallery(app, {
+  galleryHero = renderGallery(app, {
     onOpenScene: (scene) => { location.hash = `#/scene/${scene.id}`; },
     onOpenFile: openLocalFile,
     onConvertPhotos: openPhotoConverter,
     onOpenGuide: openCaptureGuide,
     onStartTour: startTour,
   });
+  if (import.meta.env.DEV) window.__hero = galleryHero;
+  maybeAutoStartTour();
 }
 
 // ---------- Guided tour ----------
@@ -145,15 +176,25 @@ function startTour() {
   runTour(TOUR_STEPS);
 }
 
+// The scroll hero is now the landing experience, so the first-visit tour waits
+// until the user actually reaches the gallery content instead of covering it.
 function maybeAutoStartTour() {
-  if (!tourWasSeen() && parseHash(location.hash).route === '/') {
-    setTimeout(startTour, 600);
-  }
+  if (tourWasSeen()) return;
+  const target = app.querySelector('[data-tour="scenes"]');
+  if (!target) return;
+  tourObserver = new IntersectionObserver((entries) => {
+    if (!entries[0].isIntersecting) return;
+    tourObserver.disconnect();
+    tourObserver = null;
+    if (!tourWasSeen()) startTour();
+  }, { threshold: 0.25 });
+  tourObserver.observe(target);
 }
 
 async function showViewer(source, { initialView, initialPath, webXRMode = 'None' } = {}) {
   const token = ++navToken;
   teardownViewerPage();
+  teardownGalleryPage();
   currentSource = source;
   currentXRMode = webXRMode;
   document.title = `${source.name} — Mirage`;
@@ -187,6 +228,7 @@ async function showViewer(source, { initialView, initialPath, webXRMode = 'None'
 
   mirage = new MirageViewer(host);
   if (import.meta.env.DEV) window.__mirage = mirage; // dev-only inspection hook
+  if (perfHudEnabled()) perfHud = new PerfHud(page);
   setupViewerTools();
   startStatsLoop();
   overlay.show(source.name);
@@ -232,24 +274,64 @@ function friendlyLoadError(err) {
 
 // ---------- Actions ----------
 
-function openLocalFile(file) {
+async function openLocalFile(file) {
   const format = formatForFilename(file.name);
   if (format === undefined) {
     toast(`"${file.name}" isn't a supported format — try .ply, .splat, .ksplat, or .spz.`, 'error');
     return;
   }
+
+  // Persist to the IndexedDB library first: the scene gets a #/lib/<id>
+  // URL that still works after a reload. If storage fails (quota,
+  // private mode), fall back to the session-only object-URL flow.
+  if (librarySupported()) {
+    try {
+      const meta = await saveScene(file);
+      toast(`Saved to your library — "${file.name}" will still be here after a reload.`, 'success', 4000);
+      location.hash = `#/lib/${meta.id}`; // the router loads it from the library
+      return;
+    } catch (err) {
+      console.warn('Library save failed, opening session-only:', err);
+      toast('Could not save to your library (storage full or blocked) — opening without saving.', 'info', 5000);
+    }
+  }
+
   if (localUrl) URL.revokeObjectURL(localUrl);
   localUrl = URL.createObjectURL(file);
   location.hash = '#/local';
-  showViewer({
-    url: localUrl,
+  showViewer(localFileSource(file.name, localUrl, format));
+}
+
+function localFileSource(fileName, url, format) {
+  return {
+    url,
     format,
-    name: file.name,
+    name: fileName,
     isLocal: true,
-    fileName: file.name,
+    fileName,
     // Captured scenes (COLMAP / Inria pipeline) are usually -Y up.
     camera: { up: [0, -1, 0], position: [0, 0, 5], lookAt: [0, 0, 0] },
-  });
+  };
+}
+
+async function openLibraryScene(id, extras = {}) {
+  let record = null;
+  try {
+    record = await getScene(id);
+  } catch (err) {
+    console.error('Library read failed:', err);
+  }
+  if (!record) {
+    toast('That scene is no longer in your library.', 'error');
+    location.hash = '#/';
+    return;
+  }
+  if (localUrl) URL.revokeObjectURL(localUrl);
+  localUrl = URL.createObjectURL(record.blob);
+  showViewer({
+    ...localFileSource(record.name, localUrl, formatForFilename(record.name)),
+    libraryId: id,
+  }, extras);
 }
 
 async function takeScreenshot() {
@@ -581,6 +663,15 @@ function route() {
     }
     toast(`Unknown scene "${sceneMatch[1]}".`, 'error');
   }
+  const libMatch = r.match(/^\/lib\/([\w-]+)$/);
+  if (libMatch) {
+    if (currentSource?.libraryId === libMatch[1]) return; // already showing it
+    openLibraryScene(libMatch[1], {
+      initialView: decodePose(params.get('view')),
+      initialPath: params.get('path') ? CameraPath.fromURLValue(params.get('path')) : null,
+    });
+    return;
+  }
   if (r === '/local' && currentSource?.isLocal) return; // already showing it
   if (r !== '/') location.hash = '#/';
   showGallery();
@@ -594,4 +685,3 @@ installDragAndDrop({
   onReject: (msg) => toast(msg, 'error'),
 });
 route();
-maybeAutoStartTour();
