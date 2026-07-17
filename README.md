@@ -10,7 +10,7 @@ Point a phone at an object or a room, run it through a splatting pipeline, and w
 
 ## What it does
 
-- **Scroll-story landing page** — an Apple-style scroll-scrubbed image sequence (120 native-1080p frames, canvas cover-fit) flies you into a particle nebula while the story fades through in staggered-parallax chapters, with clickable chapter dots and scroll-revealed content below. [Lenis](https://lenis.darkroom.engineering/) smooths the page scroll (paused inside the viewer so the wheel stays with orbit-zoom); works in portrait and landscape, streams keyframes-first, and collapses to a static hero under `prefers-reduced-motion`.
+- **Scroll-story landing page** — an Apple-style scroll-scrubbed image sequence (240 native-1080p frames, canvas cover-fit) flies you into a particle nebula while the story fades through in staggered-parallax chapters, with clickable chapter dots and scroll-revealed content below. Adjacent frames **crossfade** by the fractional scroll position, so every frame composites a unique in-between image — motion stays continuous at 60fps instead of stepping between stills. [Lenis](https://lenis.darkroom.engineering/) smooths the page scroll (paused inside the viewer so the wheel stays with orbit-zoom); works in portrait and landscape, streams keyframes-first, and collapses to a static hero under `prefers-reduced-motion`.
 - **Scene gallery** with bundled sample scenes that load progressively — splats appear while the file is still streaming.
 - **Drag & drop** any `.ply` / `.splat` / `.ksplat` / `.spz` capture onto the page and it renders instantly. Files are parsed entirely client-side; the privacy story is "your capture never leaves your machine."
 - **Smooth damped orbit / pan / zoom**, reset view, fullscreen, one-click PNG screenshots.
@@ -122,7 +122,7 @@ The *View in VR/AR* button only appears when the device reports a supported sess
 ```
 mirage/
   public/scenes/          sample .splat files (generated, ~6 MB total)
-  public/hero/            scroll-hero frame sequence (120 × 1920×1016 webp)
+  public/hero/            scroll-hero frame sequence (240 × 1920×1016 webp)
   scripts/
     generate-scenes.mjs   procedural sample-scene generator
   src/

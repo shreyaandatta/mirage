@@ -151,11 +151,12 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
   renderLibrarySection(container);
   installReveals(container);
 
-  // Scroll-scrubbed hero: 120 frames of a dolly into a particle nebula —
+  // Scroll-scrubbed hero: 240 frames of a dolly into a particle nebula —
   // scrolling flies you into the cloud while the story fades through.
   const hero = new ScrollHero(container.querySelector('.hero-mount'), {
-    frameCount: 120,
+    frameCount: 240,
     frameUrl: (i) => `${import.meta.env.BASE_URL}hero/${String(i).padStart(3, '0')}.webp`,
+    frameSize: { w: 1920, h: 1016 },
     stages: HERO_STAGES,
     // Lenis already lerps the page scroll, so the scrub tracks it 1:1 —
     // any extra easing here stacks a second smoothing filter into visible lag.

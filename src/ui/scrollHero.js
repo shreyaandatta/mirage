@@ -5,17 +5,23 @@
  * out at set progress windows.
  *
  * Engineering notes:
- * - Frames draw cover-fit at devicePixelRatio (capped at 2), so the same
- *   portrait source works in landscape and portrait viewports; a ResizeObserver
- *   re-rasterizes on resize/orientation change.
+ * - Frames draw cover-fit, so the same source works in landscape and portrait
+ *   viewports; a ResizeObserver re-rasterizes on resize/orientation change.
+ * - The canvas backing store is capped at *source* resolution, not raw
+ *   devicePixelRatio: past the point where one canvas pixel maps to one source
+ *   pixel, extra backing pixels add zero sharpness but multiply per-frame fill
+ *   cost. On a 2x MacBook this cuts pixels written per draw by ~4x.
+ * - Scroll position maps to a fractional frame index, and the scrubber
+ *   *crossfades* adjacent frames by the fraction (two draws, second with
+ *   globalAlpha). Every rAF composites a unique in-between image, so motion is
+ *   continuous at any scroll speed instead of stepping at frame boundaries.
  * - Frames load progressively (stride 8 → 4 → 2 → 1, concurrency-limited), and
- *   the scrubber draws the nearest *loaded* frame, so the hero is interactive
- *   after ~15 keyframes (~400 KB) while the rest stream in.
- * - The frame index is eased toward the scroll target each rAF for a fluid,
- *   momentum-like scrub; we only re-draw when the rounded frame changes. The
- *   ease factor is an option: when a smooth-scroll library (Lenis) is already
- *   lerping the page scroll, callers pass a tighter value so two smoothing
- *   filters don't stack into visible lag.
+ *   the scrubber draws the nearest *loaded* frame until neighbours arrive, so
+ *   the hero is interactive after ~30 keyframes while the rest stream in.
+ * - The frame index is eased toward the scroll target each rAF; the ease
+ *   factor is an option — when a smooth-scroll library (Lenis) is already
+ *   lerping the page scroll, callers pass 1 so two smoothing filters don't
+ *   stack into visible lag.
  * - `prefers-reduced-motion` collapses the section to a single static screen.
  */
 
@@ -34,19 +40,23 @@ export class ScrollHero {
    *   frameCount, frameUrl(i),
    *   stages: [{ html, from, to, hold?, interactive? }],
    *   onAction(name), — clicks on [data-act] inside stages
-   *   ease?           — per-frame scrub easing (tighter when Lenis smooths scroll)
+   *   ease?,          — per-frame scrub easing (1 when Lenis smooths scroll)
+   *   frameSize?      — { w, h } of the source frames, for the resolution cap
+   *                     before the first frame decodes
    * }
    */
-  constructor(mount, { frameCount, frameUrl, stages, onAction, ease }) {
+  constructor(mount, { frameCount, frameUrl, stages, onAction, ease, frameSize }) {
     this.frameCount = frameCount;
     this.frameUrl = frameUrl;
     this.stages = stages;
     this.ease = ease ?? EASE;
+    this.frameSize = frameSize ?? null;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     this.images = new Array(frameCount).fill(null);
     this.current = 0;          // eased frame position
-    this.drawnFrame = -1;
+    this.drawnFrame = -1;      // integer part of the last drawn position
+    this.drawnBlend = -1;      // crossfade fraction of the last drawn position
     this.raf = 0;
     this.running = false;
     this.destroyed = false;
@@ -158,9 +168,19 @@ export class ScrollHero {
 
   _resize() {
     const rect = this.sticky.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
     this.cssW = Math.max(1, rect.width);
     this.cssH = Math.max(1, rect.height);
+    let dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    // Source-resolution cap: under cover-fit, one source pixel spans
+    // max(cssW/srcW, cssH/srcH) CSS px. Backing density beyond 1/that adds no
+    // sharpness (the source is the detail limit) but multiplies fill cost.
+    const src = this.frameSize ?? this.images.find(Boolean);
+    if (src) {
+      const srcW = src.w ?? src.naturalWidth;
+      const srcH = src.h ?? src.naturalHeight;
+      const cssPerSrcPx = Math.max(this.cssW / srcW, this.cssH / srcH);
+      dpr = Math.min(dpr, Math.max(1, 1 / cssPerSrcPx));
+    }
     this.canvas.width = Math.round(this.cssW * dpr);
     this.canvas.height = Math.round(this.cssH * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -168,18 +188,31 @@ export class ScrollHero {
     this.drawnFrame = -1; // force redraw at new size
   }
 
-  _draw(force = false) {
-    const idx = this._nearestLoaded(this.current);
-    if (idx < 0) return;
-    if (!force && idx === this.drawnFrame) return;
-    const img = this.images[idx];
+  _drawCover(img, alpha = 1) {
     const { cssW: w, cssH: h } = this;
     const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
     const dw = img.naturalWidth * s;
     const dh = img.naturalHeight * s;
-    this.ctx.clearRect(0, 0, w, h);
+    this.ctx.globalAlpha = alpha;
     this.ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-    this.drawnFrame = idx;
+    this.ctx.globalAlpha = 1;
+  }
+
+  _draw(force = false) {
+    // Crossfade the two frames around the fractional scrub position. While
+    // the sequence is still streaming, fall back to the nearest loaded frame.
+    const i0 = Math.min(Math.floor(this.current), this.frameCount - 1);
+    const frac = this.current - i0;
+    const base = this.images[i0] ? i0 : this._nearestLoaded(this.current);
+    if (base < 0) return;
+    const next = base === i0 && frac > 0.01 ? this.images[i0 + 1] : null;
+    const blend = next ? Math.round(frac * 50) / 50 : 0; // quantize: skip sub-2% redraws
+    if (!force && base === this.drawnFrame && blend === this.drawnBlend) return;
+    this.ctx.clearRect(0, 0, this.cssW, this.cssH);
+    this._drawCover(this.images[base]);
+    if (next) this._drawCover(next, blend);
+    this.drawnFrame = base;
+    this.drawnBlend = blend;
   }
 
   // ---------- scrub loop ----------
