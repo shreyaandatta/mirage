@@ -41,7 +41,7 @@ button {
 
 .scroll-hero {
   position: relative;
-  height: 460vh;               /* scrub distance: ~3.6 screens of travel */
+  height: 500vh;               /* scrub distance: ~4 screens of travel */
   background: #050508;
 }
 
@@ -77,26 +77,56 @@ button {
   opacity: 0;
 }
 
+/* Film grain: a static SVG-noise tile keeps the smooth gradients from
+   looking too digital. Cheap — no animation, one composited layer. */
+.sh-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 .sh-stage {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
+  align-content: center;
   text-align: center;
   padding: 24px;
   opacity: 0;
   pointer-events: none;
-  will-change: opacity, transform;
+  will-change: opacity;
 }
 
-.sh-stage > * { max-width: 680px; }
+/* Staggered parallax: the scrub sets --rise on the stage; each child rises
+   at its own rate, so the copy settles in layers instead of as one slab. */
+.sh-stage > * { max-width: 680px; transform: translateY(var(--rise, 0px)); will-change: transform; }
+.sh-stage .sh-kicker { transform: translateY(calc(var(--rise, 0px) * 0.55)); }
+.sh-stage .sh-sub { transform: translateY(calc(var(--rise, 0px) * 1.7)); }
+.sh-stage .sh-actions { transform: translateY(calc(var(--rise, 0px) * 2.2)); }
+
+.sh-kicker {
+  font-size: 12px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(196, 181, 253, 0.9);
+  text-shadow: 0 1px 10px rgba(5, 5, 10, 0.9);
+  margin-bottom: 14px;
+}
 
 .sh-word {
   font-size: clamp(3rem, 11vw, 7.5rem);
   font-weight: 800;
   letter-spacing: 0.18em;
   margin-left: 0.18em;         /* optically recenter tracked-out type */
-  text-shadow: 0 2px 24px rgba(5, 5, 10, 0.9), 0 0 80px rgba(139, 124, 246, 0.35);
+  background: linear-gradient(180deg, #ffffff 25%, #d3c8fd 65%, #9d8df8 105%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 24px rgba(5, 5, 10, 0.9)) drop-shadow(0 0 46px rgba(139, 124, 246, 0.35));
 }
 
 .sh-stage h2 {
@@ -169,6 +199,35 @@ button {
   50% { transform: translateY(6px); opacity: 1; }
 }
 
+/* Chapter dots: one per story stage, clickable to glide there via Lenis */
+.sh-dots {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 3;
+}
+
+.sh-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+}
+
+.sh-dot:hover { background: rgba(255, 255, 255, 0.6); }
+
+.sh-dot.active {
+  background: #fff;
+  transform: scale(1.4);
+  box-shadow: 0 0 12px rgba(196, 181, 253, 0.8);
+}
+
 /* Short landscape viewports (rotated phones): tighten the type */
 @media (max-height: 500px) {
   .sh-word { font-size: clamp(2.4rem, 9vh, 4.5rem); }
@@ -177,21 +236,55 @@ button {
   .sh-cue { bottom: 12px; }
 }
 
+@media (max-width: 640px) {
+  .sh-dots { right: 12px; gap: 12px; }
+  .sh-dot { width: 6px; height: 6px; }
+}
+
+/* Scroll-reveal for the content below the hero */
+.reveal,
+.reveal-cards .scene-card {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-cards .scene-card { transition-delay: calc(var(--i, 0) * 90ms); }
+
+.reveal.revealed,
+.reveal-cards.revealed .scene-card {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-cards .scene-card {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 /* Reduced motion: collapse to one static screen, no scrubbing */
 .scroll-hero.sh-static { height: 100vh; height: 100svh; }
 .sh-static .sh-cue { display: none; }
+.sh-static .sh-dots { display: none; }
 .sh-static .sh-stage { opacity: 0; }
 .sh-static .sh-stage[data-stage="0"] {
   opacity: 1;
   place-items: start center;
+  align-content: start;
   padding-top: 16vh;
 }
 .sh-static .sh-stage.interactive {
   opacity: 1;
   pointer-events: auto;
   place-items: end center;
+  align-content: end;
   padding-bottom: 12vh;
 }
+.sh-static .sh-stage.interactive .sh-kicker { display: none; }
 .sh-static .sh-stage.interactive h2 { display: none; }
 
 /* ---------- Gallery ---------- */

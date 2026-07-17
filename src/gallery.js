@@ -3,6 +3,7 @@ import { isSupportedFilename } from './viewer.js';
 import { looksLikeHeic } from './heicDetect.js';
 import { placeholderReference } from './ui/compareSlider.js';
 import { ScrollHero } from './ui/scrollHero.js';
+import { smoothScrollActive, smoothScrollTo } from './smoothScroll.js';
 import { librarySupported, listScenes, deleteScene } from './sceneLibrary.js';
 
 // Bundled sample scenes. These are procedurally generated .splat files
@@ -148,6 +149,7 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
   container.querySelector('#start-tour')?.addEventListener('click', () => onStartTour?.());
 
   renderLibrarySection(container);
+  installReveals(container);
 
   // Scroll-scrubbed hero: 120 frames of a dolly into a particle nebula —
   // scrolling flies you into the cloud while the story fades through.
@@ -155,8 +157,11 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
     frameCount: 120,
     frameUrl: (i) => `${import.meta.env.BASE_URL}hero/${String(i).padStart(3, '0')}.webp`,
     stages: HERO_STAGES,
+    // Lenis already lerps the page scroll, so the scrub tracks it 1:1 —
+    // any extra easing here stacks a second smoothing filter into visible lag.
+    ease: smoothScrollActive() ? 1 : undefined,
     onAction: (act) => {
-      if (act === 'explore') container.querySelector('.gallery-inner')?.scrollIntoView({ behavior: 'smooth' });
+      if (act === 'explore') smoothScrollTo(container.querySelector('.gallery-inner'));
       else if (act === 'guide') onOpenGuide?.();
     },
   });
@@ -171,24 +176,59 @@ const HERO_STAGES = [
   },
   {
     from: 0.28, to: 0.5,
-    html: `<h2>Not polygons.<br><em>A hundred thousand points of light.</em></h2>
+    html: `<div class="sh-kicker">01 · The medium</div>
+           <h2>Not polygons.<br><em>A hundred thousand points of light.</em></h2>
            <p class="sh-sub">Every scene is a cloud of gaussians — translucent, glowing primitives,
            sorted and blended in real time.</p>`,
   },
   {
     from: 0.56, to: 0.76,
-    html: `<h2>Rendered live,<br><em>right in your browser.</em></h2>
+    html: `<div class="sh-kicker">02 · The engine</div>
+           <h2>Rendered live,<br><em>right in your browser.</em></h2>
            <p class="sh-sub">Pure WebGL. No install, no upload — your captures never leave your machine.</p>`,
   },
   {
     from: 0.84, to: 1, hold: 'end', interactive: true,
-    html: `<h2>Step inside.</h2>
+    html: `<div class="sh-kicker">03 · Your turn</div>
+           <h2>Step inside.</h2>
            <div class="sh-actions">
              <button class="btn primary" data-act="explore">Explore the gallery</button>
              <button class="btn sh-ghost" data-act="guide">Capture your own →</button>
            </div>`,
   },
 ];
+
+// Scroll-reveal: below-the-fold sections fade-and-rise as the Lenis glide
+// brings them into view. Scene cards inside a grid stagger via --i.
+// One module-level observer, rebuilt per render; reduced motion opts out
+// entirely (the CSS also guards, so elements just render in place).
+let revealObserver = null;
+
+function installReveals(container) {
+  revealObserver?.disconnect();
+  revealObserver = null;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  revealObserver = new IntersectionObserver((entries, obs) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      entry.target.classList.add('revealed');
+      obs.unobserve(entry.target);
+    }
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  const items = [
+    ...container.querySelectorAll('.gallery-inner > *'),
+    container.querySelector('.gallery-footer'),
+  ].filter(Boolean);
+  for (const el of items) {
+    el.classList.add(el.classList.contains('scene-grid') ? 'reveal-cards' : 'reveal');
+    revealObserver.observe(el);
+  }
+  container.querySelectorAll('.scene-grid').forEach((grid) => {
+    [...grid.children].forEach((card, i) => card.style.setProperty('--i', i));
+  });
+}
 
 const LIB_THUMB = 'radial-gradient(ellipse 70% 60% at 50% 45%, #7dd3fc 0%, #0ea5e9 30%, #1e3a5f 65%, #0a0f1a 100%)';
 
@@ -235,6 +275,7 @@ async function renderLibrarySection(container) {
       card.remove();
       if (!grid.children.length) label.hidden = true;
     });
+    card.style.setProperty('--i', grid.children.length); // reveal stagger index
     grid.appendChild(card);
   }
 }

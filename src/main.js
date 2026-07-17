@@ -16,6 +16,7 @@ import { CropPanel } from './ui/cropPanel.js';
 import { cropSplats, downloadCroppedKSplat } from './crop.js';
 import { parseHash, buildHash, encodePose, decodePose } from './urlState.js';
 import { librarySupported, saveScene, getScene } from './sceneLibrary.js';
+import { initSmoothScroll, pauseSmoothScroll, resumeSmoothScroll } from './smoothScroll.js';
 import { RollingWindow } from './perfStats.js';
 import { PerfHud, perfHudEnabled } from './ui/perfHud.js';
 
@@ -144,6 +145,7 @@ function teardownGalleryPage() {
 function showGallery() {
   teardownViewerPage();
   teardownGalleryPage();
+  resumeSmoothScroll();
   document.title = 'Mirage — real-time Gaussian Splatting in the browser';
   galleryHero = renderGallery(app, {
     onOpenScene: (scene) => { location.hash = `#/scene/${scene.id}`; },
@@ -195,6 +197,9 @@ async function showViewer(source, { initialView, initialPath, webXRMode = 'None'
   const token = ++navToken;
   teardownViewerPage();
   teardownGalleryPage();
+  // The viewer is a fixed full-viewport page — hand the wheel back to
+  // OrbitControls zoom instead of Lenis.
+  pauseSmoothScroll();
   currentSource = source;
   currentXRMode = webXRMode;
   document.title = `${source.name} — Mirage`;
@@ -678,6 +683,10 @@ function route() {
 }
 
 window.addEventListener('hashchange', route);
+
+// Lenis smooth scrolling for the landing page (no-op under reduced motion).
+// Must exist before the first route() so the hero can tune its scrub easing.
+initSmoothScroll();
 
 installDragAndDrop({
   onOpenFile: openLocalFile,

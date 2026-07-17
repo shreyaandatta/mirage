@@ -12,13 +12,18 @@
  *   the scrubber draws the nearest *loaded* frame, so the hero is interactive
  *   after ~15 keyframes (~400 KB) while the rest stream in.
  * - The frame index is eased toward the scroll target each rAF for a fluid,
- *   momentum-like scrub; we only re-draw when the rounded frame changes.
+ *   momentum-like scrub; we only re-draw when the rounded frame changes. The
+ *   ease factor is an option: when a smooth-scroll library (Lenis) is already
+ *   lerping the page scroll, callers pass a tighter value so two smoothing
+ *   filters don't stack into visible lag.
  * - `prefers-reduced-motion` collapses the section to a single static screen.
  */
 
 const DPR_CAP = 2;
 const EASE = 0.22;
 const RAMP = 0.05; // stage fade in/out width, in progress units
+
+import { smoothScrollTo } from '../smoothScroll.js';
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 
@@ -28,13 +33,15 @@ export class ScrollHero {
    * @param {object} opts {
    *   frameCount, frameUrl(i),
    *   stages: [{ html, from, to, hold?, interactive? }],
-   *   onAction(name)   — clicks on [data-act] inside stages
+   *   onAction(name), — clicks on [data-act] inside stages
+   *   ease?           — per-frame scrub easing (tighter when Lenis smooths scroll)
    * }
    */
-  constructor(mount, { frameCount, frameUrl, stages, onAction }) {
+  constructor(mount, { frameCount, frameUrl, stages, onAction, ease }) {
     this.frameCount = frameCount;
     this.frameUrl = frameUrl;
     this.stages = stages;
+    this.ease = ease ?? EASE;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     this.images = new Array(frameCount).fill(null);
@@ -51,8 +58,10 @@ export class ScrollHero {
         <canvas class="sh-canvas" aria-hidden="true"></canvas>
         <div class="sh-vignette"></div>
         <div class="sh-dim"></div>
+        <div class="sh-grain" aria-hidden="true"></div>
         ${stages.map((s, i) => `<div class="sh-stage${s.interactive ? ' interactive' : ''}" data-stage="${i}">${s.html}</div>`).join('')}
         <div class="sh-cue"><span>Scroll</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+        <nav class="sh-dots">${stages.map((s, i) => `<button class="sh-dot" data-dot="${i}" aria-label="Go to chapter ${i + 1}"></button>`).join('')}</nav>
       </div>
     `;
     mount.appendChild(this.root);
@@ -63,10 +72,14 @@ export class ScrollHero {
     this.dim = this.root.querySelector('.sh-dim');
     this.cue = this.root.querySelector('.sh-cue');
     this.stageEls = [...this.root.querySelectorAll('.sh-stage')];
+    this.dotEls = [...this.root.querySelectorAll('.sh-dot')];
+    this._activeDot = -2;
 
     this.root.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-act]');
-      if (btn) onAction?.(btn.dataset.act);
+      if (btn) { onAction?.(btn.dataset.act); return; }
+      const dot = e.target.closest('[data-dot]');
+      if (dot) this._seek(+dot.dataset.dot);
     });
 
     this._resize();
@@ -191,7 +204,7 @@ export class ScrollHero {
     // Snap when the tab can't animate (hidden) so state never lags reality.
     this.current = document.hidden
       ? target
-      : this.current + (target - this.current) * EASE;
+      : this.current + (target - this.current) * this.ease;
     if (Math.abs(target - this.current) < 0.05) this.current = target;
     this._draw();
     this._applyStages(p);
@@ -213,6 +226,15 @@ export class ScrollHero {
     return p;
   }
 
+  /** Chapter-dot navigation: glide to the midpoint of a stage's window. */
+  _seek(i) {
+    const s = this.stages[i];
+    if (!s) return;
+    const p = clamp01((Math.max(0, s.from) + Math.min(1, s.to)) / 2);
+    const span = this.root.offsetHeight - window.innerHeight;
+    smoothScrollTo(this.root.offsetTop + p * span);
+  }
+
   _stageAlpha(stage, p) {
     const aIn = clamp01((p - stage.from) / RAMP);
     const aOut = stage.hold === 'end' ? 1 : clamp01((stage.to - p) / RAMP);
@@ -220,13 +242,22 @@ export class ScrollHero {
   }
 
   _applyStages(p) {
+    let active = -1;
+    let best = 0.5; // a dot lights up once its stage is at least half faded in
     this.stages.forEach((stage, i) => {
       const a = this._stageAlpha(stage, p);
       const el = this.stageEls[i];
       el.style.opacity = a.toFixed(3);
-      el.style.transform = `translateY(${((1 - a) * 22).toFixed(1)}px)`;
+      // Children translate off --rise at different rates (CSS multipliers),
+      // so headline, sub, and actions rise with a staggered parallax.
+      el.style.setProperty('--rise', `${((1 - a) * 30).toFixed(1)}px`);
       el.style.pointerEvents = stage.interactive && a > 0.5 ? 'auto' : 'none';
+      if (a > best) { best = a; active = i; }
     });
+    if (active !== this._activeDot) {
+      this._activeDot = active;
+      this.dotEls.forEach((d, i) => d.classList.toggle('active', i === active));
+    }
     this.cue.style.opacity = clamp01(1 - p / 0.06).toFixed(3);
     // Gently dim the busy final frames so the CTA stays legible.
     this.dim.style.opacity = (clamp01((p - 0.8) / 0.2) * 0.45).toFixed(3);

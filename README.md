@@ -10,7 +10,7 @@ Point a phone at an object or a room, run it through a splatting pipeline, and w
 
 ## What it does
 
-- **Scroll-story landing page** — an Apple-style scroll-scrubbed image sequence (120 frames, canvas cover-fit) flies you into a particle nebula while the pitch fades through; works in portrait and landscape, streams keyframes-first, and collapses to a static hero under `prefers-reduced-motion`.
+- **Scroll-story landing page** — an Apple-style scroll-scrubbed image sequence (120 native-1080p frames, canvas cover-fit) flies you into a particle nebula while the story fades through in staggered-parallax chapters, with clickable chapter dots and scroll-revealed content below. [Lenis](https://lenis.darkroom.engineering/) smooths the page scroll (paused inside the viewer so the wheel stays with orbit-zoom); works in portrait and landscape, streams keyframes-first, and collapses to a static hero under `prefers-reduced-motion`.
 - **Scene gallery** with bundled sample scenes that load progressively — splats appear while the file is still streaming.
 - **Drag & drop** any `.ply` / `.splat` / `.ksplat` / `.spz` capture onto the page and it renders instantly. Files are parsed entirely client-side; the privacy story is "your capture never leaves your machine."
 - **Smooth damped orbit / pan / zoom**, reset view, fullscreen, one-click PNG screenshots.
@@ -57,6 +57,7 @@ Steps in **Mirage** (browser, no server): HEIC→JPG capture prep, the real-time
 | 3D runtime | Three.js `0.170` (own renderer with `preserveDrawingBuffer` for screenshots + video capture) |
 | Recording | `MediaRecorder` + `canvas.captureStream` (rAF-pumped `requestFrame`) |
 | HEIC decode | [`heic-to`](https://github.com/hoppergee/heic-to) (libheif WASM) + `jszip`, lazily code-split |
+| Smooth scroll | [`lenis`](https://github.com/darkroomengineering/lenis) driving the scroll-story landing (route-aware: stopped in the viewer) |
 | Build | Vite 7, vanilla JS — no framework |
 | Backend | none — fully static app |
 
@@ -121,11 +122,12 @@ The *View in VR/AR* button only appears when the device reports a supported sess
 ```
 mirage/
   public/scenes/          sample .splat files (generated, ~6 MB total)
-  public/hero/            scroll-hero frame sequence (120 × webp)
+  public/hero/            scroll-hero frame sequence (120 × 1920×1016 webp)
   scripts/
     generate-scenes.mjs   procedural sample-scene generator
   src/
     main.js               bootstrap + hash routing, feature wiring
+    smoothScroll.js       app-wide Lenis smooth scrolling (paused in the viewer)
     ui/scrollHero.js      scroll-scrubbed canvas image-sequence hero
     viewer.js             MirageViewer: load/dispose, quality, pose API, screenshots, WebXR
     gallery.js            scene cards, drag & drop, file ingest
