@@ -2,7 +2,7 @@ import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
 import { isSupportedFilename } from './viewer.js';
 import { looksLikeHeic } from './heicDetect.js';
 import { placeholderReference } from './ui/compareSlider.js';
-import { ScrollHero } from './ui/scrollHero.js';
+import { WebglHero } from './ui/webglHero.js';
 import { smoothScrollActive, smoothScrollTo } from './smoothScroll.js';
 import { librarySupported, listScenes, deleteScene } from './sceneLibrary.js';
 
@@ -151,21 +151,12 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
   renderLibrarySection(container);
   installReveals(container);
 
-  // Scroll-scrubbed hero: 192 frames of a dolly into a particle nebula —
-  // scrolling flies you into the cloud while the story fades through.
-  // Frames are resolution-tiered: retina laptops and up stream 2560×1440
-  // (downscaled once from the 4K master — the largest size whose per-frame
-  // decode still fits a frame budget on cache misses; raw 4K decodes at
-  // ~30ms and can never scrub at 60fps). Phones and 1080p monitors get the
-  // 1080p set — same footage, half the bytes for pixels they can't show.
-  // Data-saver and 2G connections are pinned to the light tier.
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const conn = navigator.connection;
-  const constrained = conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? '');
-  const tier = !constrained && dpr * window.innerWidth > 2100 ? '1440' : '1080';
-  const hero = new ScrollHero(container.querySelector('.hero-mount'), {
-    frameCount: 192,
-    frameUrl: (i) => `${import.meta.env.BASE_URL}hero/${tier}/${String(i).padStart(3, '0')}.webp`,
+  // Scroll-driven WebGL hero: a live particle nebula — the same procedural
+  // Spiral Nebula as the bundled sample scene — assembles out of scattered
+  // points as you scroll while the camera dollies through it. Being a live
+  // scene (not an image sequence), it renders at the display's native
+  // resolution at 60fps with zero image assets to download or decode.
+  const hero = new WebglHero(container.querySelector('.hero-mount'), {
     stages: HERO_STAGES,
     // Lenis already lerps the page scroll, so the scrub tracks it 1:1 —
     // any extra easing here stacks a second smoothing filter into visible lag.

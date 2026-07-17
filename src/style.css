@@ -51,6 +51,8 @@ button {
   height: 100vh;
   height: 100svh;              /* stable under mobile URL bars */
   overflow: hidden;
+  /* deep-space backdrop behind the transparent WebGL canvas */
+  background: radial-gradient(ellipse 120% 90% at 50% 38%, #111527 0%, #0a0c18 45%, #050508 100%);
 }
 
 .sh-canvas {

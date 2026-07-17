@@ -10,7 +10,7 @@ Point a phone at an object or a room, run it through a splatting pipeline, and w
 
 ## What it does
 
-- **Scroll-story landing page** — an Apple-style scroll-scrubbed image sequence (192 frames from a 4K master, canvas cover-fit) flies you into a particle nebula while the story fades through in staggered-parallax chapters, with clickable chapter dots and scroll-revealed content below. Adjacent frames **crossfade** by the fractional scroll position, so every frame composites a unique in-between image — motion stays continuous at 60fps instead of stepping between stills. Frames are **resolution-tiered** (2560×1440 for retina laptops, 1920×1080 for phones/1080p monitors — sized so a worst-case frame decode still fits the 16ms frame budget; raw 4K decodes can't) and warmed ahead of the scrub with `img.decode()`, so draws hit the browser's decode cache. [Lenis](https://lenis.darkroom.engineering/) smooths the page scroll (paused inside the viewer so the wheel stays with orbit-zoom); works in portrait and landscape, streams keyframes-first, and collapses to a static hero under `prefers-reduced-motion`.
+- **Scroll-story landing page** — a **live WebGL particle nebula** (~62k points, one draw call) that assembles out of scattered points of light as you scroll, while the camera dollies through it on a Catmull-Rom spline — the same `CameraPath` engine that powers the in-app fly-through recorder. The formation is the bundled Spiral Nebula sample scene, regenerated in the browser from the same seeded procedural algorithm, so the landing page literally performs the product story: points of light become an explorable scene. Because it's a live scene rather than an image sequence, it renders at the display's native resolution at 60fps with **zero image assets** — an earlier frame-sequence version was decode-bound (a 4K WebP can't decode inside a 16ms frame budget, ever), and this replaces ~56MB of tiered frames with ~2KB of shader + geometry code. [Lenis](https://lenis.darkroom.engineering/) smooths the page scroll (paused inside the viewer so the wheel stays with orbit-zoom); staggered-parallax chapters, clickable chapter dots, and scroll-revealed content below; collapses to a static screen under `prefers-reduced-motion` and degrades to a CSS fallback without WebGL.
 - **Scene gallery** with bundled sample scenes that load progressively — splats appear while the file is still streaming.
 - **Drag & drop** any `.ply` / `.splat` / `.ksplat` / `.spz` capture onto the page and it renders instantly. Files are parsed entirely client-side; the privacy story is "your capture never leaves your machine."
 - **Smooth damped orbit / pan / zoom**, reset view, fullscreen, one-click PNG screenshots.
@@ -89,6 +89,7 @@ The parts that make 70k+ translucent primitives interactive:
 - **Strict scene lifecycle** — switching scenes aborts in-flight downloads (`AbortablePromise`) and fully disposes the previous viewer (GPU buffers + sort worker), so memory is flat across arbitrarily many scene switches.
 - **Code-split heavy dependencies** — the libheif WASM decoder (~3 MB) behind HEIC conversion is dynamically imported, so it never touches the initial bundle; the app boots at ~190 KB gzipped and only fetches the decoder if you actually convert photos.
 - **Foreground-driven video capture** — recording pumps `track.requestFrame()` from the render loop (`captureStream(0)`) rather than relying on the compositor's implicit frame timing, so captured frames line up exactly with rendered ones.
+- **The landing hero is a live scene, not media** — 62k particles morph and fly in a single additive draw call with two position attributes mixed in the vertex shader; a scroll frame costs ~0.03ms of main-thread work and zero network bytes, so the hero scrubs at the display's refresh rate on any resolution.
 
 ## Capture your own scene
 
@@ -122,13 +123,12 @@ The *View in VR/AR* button only appears when the device reports a supported sess
 ```
 mirage/
   public/scenes/          sample .splat files (generated, ~6 MB total)
-  public/hero/            scroll-hero frames, resolution-tiered (192 × 1440p + 192 × 1080p webp)
   scripts/
     generate-scenes.mjs   procedural sample-scene generator
   src/
     main.js               bootstrap + hash routing, feature wiring
     smoothScroll.js       app-wide Lenis smooth scrolling (paused in the viewer)
-    ui/scrollHero.js      scroll-scrubbed canvas image-sequence hero
+    ui/webglHero.js       scroll-driven WebGL particle-nebula hero
     viewer.js             MirageViewer: load/dispose, quality, pose API, screenshots, WebXR
     gallery.js            scene cards, drag & drop, file ingest
     cameraPath.js         Catmull-Rom + slerp fly-through path + playback driver
