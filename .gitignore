@@ -4,3 +4,6 @@ dist/
 *.local
 .claude/
 build.err
+
+# 4K source frames for the scroll hero (local master, not shipped)
+videomirage/

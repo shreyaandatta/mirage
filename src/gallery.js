@@ -151,11 +151,21 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
   renderLibrarySection(container);
   installReveals(container);
 
-  // Scroll-scrubbed hero: 240 frames of a dolly into a particle nebula —
+  // Scroll-scrubbed hero: 192 frames of a dolly into a particle nebula —
   // scrolling flies you into the cloud while the story fades through.
+  // Frames are resolution-tiered: retina laptops and up stream 2560×1440
+  // (downscaled once from the 4K master — the largest size whose per-frame
+  // decode still fits a frame budget on cache misses; raw 4K decodes at
+  // ~30ms and can never scrub at 60fps). Phones and 1080p monitors get the
+  // 1080p set — same footage, half the bytes for pixels they can't show.
+  // Data-saver and 2G connections are pinned to the light tier.
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const conn = navigator.connection;
+  const constrained = conn?.saveData || /(^|-)2g$/.test(conn?.effectiveType ?? '');
+  const tier = !constrained && dpr * window.innerWidth > 2100 ? '1440' : '1080';
   const hero = new ScrollHero(container.querySelector('.hero-mount'), {
-    frameCount: 240,
-    frameUrl: (i) => `${import.meta.env.BASE_URL}hero/${String(i).padStart(3, '0')}.webp`,
+    frameCount: 192,
+    frameUrl: (i) => `${import.meta.env.BASE_URL}hero/${tier}/${String(i).padStart(3, '0')}.webp`,
     stages: HERO_STAGES,
     // Lenis already lerps the page scroll, so the scrub tracks it 1:1 —
     // any extra easing here stacks a second smoothing filter into visible lag.

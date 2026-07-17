@@ -7,14 +7,19 @@
  * Engineering notes:
  * - Frames draw cover-fit, so the same source works in landscape and portrait
  *   viewports; a ResizeObserver re-rasterizes on resize/orientation change.
- * - The canvas backing store is capped at *source* resolution, not raw
- *   devicePixelRatio: past the point where one canvas pixel maps to one source
- *   pixel, extra backing pixels add zero sharpness but multiply per-frame fill
- *   cost. On a 2x MacBook this cuts pixels written per draw by ~4x.
+ * - The canvas backing store renders at true devicePixelRatio (capped at 2):
+ *   a backing store smaller than the physical display gets a second, low-
+ *   quality browser upscale that visibly softens retina rendering, and fill
+ *   cost is trivial either way — so never cap below the display.
  * - Scroll position maps to a fractional frame index, and the scrubber
  *   *crossfades* adjacent frames by the fraction (two draws, second with
  *   globalAlpha). Every rAF composites a unique in-between image, so motion is
  *   continuous at any scroll speed instead of stepping at frame boundaries.
+ * - Frames just ahead of the scrub are warmed with img.decode(), so drawImage
+ *   hits the browser's decode cache instead of decoding synchronously. This
+ *   only works because frames are capped at 2560px: a ≤2560px decode fits a
+ *   frame budget when the cache misses, a 4K decode (~30ms) never does —
+ *   which is why the sequence ships as 2560/1080 tiers, not raw 4K.
  * - Frames load progressively (stride 8 → 4 → 2 → 1, concurrency-limited), and
  *   the scrubber draws the nearest *loaded* frame until neighbours arrive, so
  *   the hero is interactive after ~30 keyframes while the rest stream in.
@@ -54,6 +59,7 @@ export class ScrollHero {
     this.current = 0;          // eased frame position
     this.drawnFrame = -1;      // integer part of the last drawn position
     this.drawnBlend = -1;      // crossfade fraction of the last drawn position
+    this._warmedAt = -1;       // last frame index the decode warmer ran for
     this.raf = 0;
     this.running = false;
     this.destroyed = false;
@@ -144,7 +150,7 @@ export class ScrollHero {
         const i = order[cursor++];
         await this._load(i);
         // A closer frame may now exist for the current scrub position.
-        if (Math.abs(i - this.current) < 10) this._draw();
+        if (Math.abs(i - this.current) < 10) { this.images[i]?.decode().catch(() => {}); this._draw(); }
       }
     };
     await Promise.all(Array.from({ length: concurrency }, worker));
@@ -159,6 +165,28 @@ export class ScrollHero {
       if (this.images[t + d]) return t + d;
     }
     return -1;
+  }
+
+  // ---------- decode warming ----------
+
+  /**
+   * Ask the browser to decode frames just ahead of the scrub position.
+   * img.decode() fills the browser's own decode cache off the main thread —
+   * no app-owned bitmaps, no eviction bookkeeping, no multi-MB allocation
+   * churn — so the upcoming drawImage calls are cache hits instead of
+   * synchronous decodes. The browser owns sizing and eviction; if it drops a
+   * frame we simply pay one short decode on draw, which at ≤2560px stays
+   * within a frame budget (a 4K decode does not — hence the frame tier cap).
+   */
+  _warm() {
+    const at = Math.floor(this.current);
+    if (at === this._warmedAt) return;
+    const dir = at >= this._warmedAt ? 1 : -1; // warm ahead of travel
+    this._warmedAt = at;
+    for (let d = -2; d <= 14; d++) {
+      const img = this.images[at + d * dir];
+      img?.decode().catch(() => { /* decode raced a cache eviction — draw pays it */ });
+    }
   }
 
   // ---------- drawing ----------
@@ -184,9 +212,11 @@ export class ScrollHero {
 
   _drawCover(img, alpha = 1) {
     const { cssW: w, cssH: h } = this;
-    const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-    const dw = img.naturalWidth * s;
-    const dh = img.naturalHeight * s;
+    const iw = img.naturalWidth ?? img.width;   // <img> vs ImageBitmap
+    const ih = img.naturalHeight ?? img.height;
+    const s = Math.max(w / iw, h / ih);
+    const dw = iw * s;
+    const dh = ih * s;
     this.ctx.globalAlpha = alpha;
     this.ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
     this.ctx.globalAlpha = 1;
@@ -233,6 +263,7 @@ export class ScrollHero {
       ? target
       : this.current + (target - this.current) * this.ease;
     if (Math.abs(target - this.current) < 0.05) this.current = target;
+    this._warm();
     this._draw();
     this._applyStages(p);
 
@@ -248,6 +279,7 @@ export class ScrollHero {
   update() {
     const p = this.progress();
     this.current = p * (this.frameCount - 1);
+    this._warm();
     this._draw(true);
     this._applyStages(p);
     return p;
