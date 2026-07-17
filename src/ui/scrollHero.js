@@ -40,17 +40,14 @@ export class ScrollHero {
    *   frameCount, frameUrl(i),
    *   stages: [{ html, from, to, hold?, interactive? }],
    *   onAction(name), — clicks on [data-act] inside stages
-   *   ease?,          — per-frame scrub easing (1 when Lenis smooths scroll)
-   *   frameSize?      — { w, h } of the source frames, for the resolution cap
-   *                     before the first frame decodes
+   *   ease?           — per-frame scrub easing (1 when Lenis smooths scroll)
    * }
    */
-  constructor(mount, { frameCount, frameUrl, stages, onAction, ease, frameSize }) {
+  constructor(mount, { frameCount, frameUrl, stages, onAction, ease }) {
     this.frameCount = frameCount;
     this.frameUrl = frameUrl;
     this.stages = stages;
     this.ease = ease ?? EASE;
-    this.frameSize = frameSize ?? null;
     this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     this.images = new Array(frameCount).fill(null);
@@ -170,17 +167,14 @@ export class ScrollHero {
     const rect = this.sticky.getBoundingClientRect();
     this.cssW = Math.max(1, rect.width);
     this.cssH = Math.max(1, rect.height);
-    let dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
-    // Source-resolution cap: under cover-fit, one source pixel spans
-    // max(cssW/srcW, cssH/srcH) CSS px. Backing density beyond 1/that adds no
-    // sharpness (the source is the detail limit) but multiplies fill cost.
-    const src = this.frameSize ?? this.images.find(Boolean);
-    if (src) {
-      const srcW = src.w ?? src.naturalWidth;
-      const srcH = src.h ?? src.naturalHeight;
-      const cssPerSrcPx = Math.max(this.cssW / srcW, this.cssH / srcH);
-      dpr = Math.min(dpr, Math.max(1, 1 / cssPerSrcPx));
-    }
+    // Render at the display's true pixel density (capped for extreme DPRs).
+    // Do NOT cap below the physical resolution to "save" pixels: a canvas
+    // smaller than the screen gets upscaled a second time by the browser with
+    // low-quality bilinear scaling, which visibly softens the image on retina
+    // whenever the window is wider than the source. Let one high-quality
+    // drawImage do all the upscaling instead — the source resolution is the
+    // real detail ceiling, and fill cost here is trivial (<1ms/draw).
+    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
     this.canvas.width = Math.round(this.cssW * dpr);
     this.canvas.height = Math.round(this.cssH * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

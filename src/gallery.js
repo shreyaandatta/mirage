@@ -156,7 +156,6 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
   const hero = new ScrollHero(container.querySelector('.hero-mount'), {
     frameCount: 240,
     frameUrl: (i) => `${import.meta.env.BASE_URL}hero/${String(i).padStart(3, '0')}.webp`,
-    frameSize: { w: 1920, h: 1016 },
     stages: HERO_STAGES,
     // Lenis already lerps the page scroll, so the scrub tracks it 1:1 —
     // any extra easing here stacks a second smoothing filter into visible lag.
