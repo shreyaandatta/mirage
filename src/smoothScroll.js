@@ -14,14 +14,15 @@ export function initSmoothScroll() {
   if (lenis) return lenis;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
   // anchors stays off: the app routes via location.hash (#/scene/…), which
-  // Lenis's anchor handling must not intercept. Duration + expo-out easing
-  // (the config Lenis's docs recommend) responds instantly to input and
-  // settles fast — the default lerp mode reads as scroll lag on a scrubbed
-  // sequence.
+  // Lenis's anchor handling must not intercept. Lerp mode (lenis.dev's own
+  // feel) over duration+easing: delta-time damped, so identical on 60/120Hz.
+  // 0.05 is deliberately floatier than the 0.1 default — the hero tracks
+  // scroll 1:1 (ease=1), so Lenis is the only smoothing filter in the chain
+  // and can afford the longer settle without reading as lag.
   lenis = new Lenis({
     autoRaf: true,
-    duration: 1.2,
-    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    lerp: 0.05,
+    wheelMultiplier: 1,
   });
   if (import.meta.env.DEV) window.__lenis = lenis;
   return lenis;
