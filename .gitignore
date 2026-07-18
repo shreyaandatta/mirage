@@ -7,3 +7,6 @@ build.err
 
 # 4K source frames for the scroll hero (local master, not shipped)
 videomirage/
+
+# Local-only handoff doc, intentionally not published
+design1.md
