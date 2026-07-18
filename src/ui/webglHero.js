@@ -113,7 +113,7 @@ function buildNebulaAttributes(density = 1) {
       lerp(236, 200, 1 - heat),
       lerp(205, 120, 1 - heat),
     ];
-    push([r * Math.cos(theta), y, r * Math.sin(theta)], R(0.02, 0.07), c, (120 + heat * 135) / 255);
+    push([r * Math.cos(theta), y, r * Math.sin(theta)], R(0.02, 0.07), c, (34 + heat * 58) / 255);
   }
 
   // Two logarithmic spiral arms
@@ -222,7 +222,10 @@ const VERT = /* glsl */ `
     float dist = max(0.12, -mv.z);
     gl_PointSize = clamp(aSize * uScale / dist, 1.0, 48.0);
     vColor = aColor;
-    vAlpha = aAlpha * (0.45 + 0.55 * f);
+    // brighten as particles form, but keep the ramp gentle: additive
+    // blending stacks overlapping particles, so a steep ramp blows the
+    // dense core to white right as the nebula merges together.
+    vAlpha = aAlpha * (0.45 + 0.3 * f);
     vSeed = aSeed;
   }
 `;
@@ -378,7 +381,7 @@ export class WebglHero {
       uForm: { value: 0 },
       uTime: { value: 0 },
       uScale: { value: 1 },
-      uGain: { value: 0.75 },
+      uGain: { value: 0.66 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
