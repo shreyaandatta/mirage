@@ -142,10 +142,8 @@ button {
 
 .sh-stage h2 em {
   font-style: normal;
-  background: linear-gradient(90deg, #c4b5fd, #7cc9f8);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: inherit;
+  -webkit-text-fill-color: currentColor;   /* match the plain h2 line, no gradient */
   filter: drop-shadow(0 2px 18px rgba(10, 8, 20, 0.9));
 }
 
