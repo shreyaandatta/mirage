@@ -12,7 +12,6 @@ import { CameraPath, playPath } from './cameraPath.js';
 import { PathPanel } from './ui/pathPanel.js';
 import { openCaptureGuide } from './ui/guide.js';
 import { CompareSlider } from './ui/compareSlider.js';
-import { runTour, tourWasSeen } from './ui/tour.js';
 import { CropPanel } from './ui/cropPanel.js';
 import { cropSplats, downloadCroppedKSplat } from './crop.js';
 import { parseHash, buildHash, encodePose, decodePose } from './urlState.js';
@@ -134,13 +133,10 @@ function startStatsLoop() {
 // ---------- Pages ----------
 
 let galleryHero = null;     // ScrollHero instance while the gallery is shown
-let tourObserver = null;    // arms first-visit tour when the gallery scrolls into view
 
 function teardownGalleryPage() {
   galleryHero?.destroy();
   galleryHero = null;
-  tourObserver?.disconnect();
-  tourObserver = null;
 }
 
 function showGallery() {
@@ -154,45 +150,8 @@ function showGallery() {
     onConvertPhotos: openPhotoConverter,
     onCaptureLive: openCameraCapture,
     onOpenGuide: openCaptureGuide,
-    onStartTour: startTour,
   });
   if (import.meta.env.DEV) window.__hero = galleryHero;
-  maybeAutoStartTour();
-}
-
-// ---------- Guided tour ----------
-
-const TOUR_STEPS = [
-  { title: 'Welcome to Mirage', body: 'Capture real objects and spaces with a phone, then explore them as photorealistic 3D scenes right here in your browser. Here’s the 20-second tour.' },
-  { selector: '[data-tour="scenes"]', title: 'Sample scenes', body: 'Start with a bundled scene — each is tens of thousands of gaussians, sorted and rendered live every frame.' },
-  { selector: '[data-tour="upload"]', title: 'Bring your own capture', body: 'Drop a .ply / .splat / .ksplat / .spz anywhere on the page. It’s processed entirely in your browser — nothing is uploaded.' },
-  { selector: '[data-tour="prep"]', title: 'Capture prep', body: 'iPhone photos are HEIC; COLMAP wants JPG. Convert a whole shoot to JPG here before you reconstruct.' },
-  {
-    title: 'Inside a scene',
-    body: 'Opening the nebula… you can orbit, screenshot, record an MP4 fly-through, build a cinematic camera path, compare against a reference photo, and share a link to any view.',
-    navigate: () => { if (parseHash(location.hash).route !== '/scene/nebula') location.hash = '#/scene/nebula'; },
-    selector: '.toolbar',
-  },
-  { selector: '.toolbar-extra', title: 'Path · compare · share', body: 'These are the fly-through path recorder, the photo-vs-splat compare slider, and “copy a link to this exact view.” That’s the whole loop — go explore!' },
-];
-
-function startTour() {
-  runTour(TOUR_STEPS);
-}
-
-// The scroll hero is now the landing experience, so the first-visit tour waits
-// until the user actually reaches the gallery content instead of covering it.
-function maybeAutoStartTour() {
-  if (tourWasSeen()) return;
-  const target = app.querySelector('[data-tour="scenes"]');
-  if (!target) return;
-  tourObserver = new IntersectionObserver((entries) => {
-    if (!entries[0].isIntersecting) return;
-    tourObserver.disconnect();
-    tourObserver = null;
-    if (!tourWasSeen()) startTour();
-  }, { threshold: 0.25 });
-  tourObserver.observe(target);
 }
 
 async function showViewer(source, { initialView, initialPath, webXRMode = 'None' } = {}) {

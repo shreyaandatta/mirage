@@ -61,7 +61,7 @@ const CAMERA_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"
  * @param {HTMLElement} container
  * @param {object} handlers { onOpenScene(scene), onOpenFile(file) }
  */
-export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPhotos, onCaptureLive, onOpenGuide, onStartTour }) {
+export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPhotos, onCaptureLive, onOpenGuide }) {
   container.innerHTML = `
     <div class="gallery">
       <div class="hero-mount"></div>
@@ -69,7 +69,6 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
         <header class="hero compact">
           <div class="wordmark">
             <div class="orb"></div><h1>Mirage</h1>
-            <button class="tour-replay" id="start-tour" title="Take the tour">?</button>
           </div>
           <p class="sub">Real-time 3D Gaussian Splatting — photorealistic radiance-field scenes
           rendered at interactive frame rates with WebGL. Pick a sample below, or drop in your own capture.</p>
@@ -161,8 +160,6 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
 
   container.querySelectorAll('#open-guide, #open-guide-footer').forEach(
     el => el.addEventListener('click', () => onOpenGuide?.()));
-
-  container.querySelector('#start-tour')?.addEventListener('click', () => onStartTour?.());
 
   renderLibrarySection(container);
   installReveals(container);
