@@ -34,6 +34,14 @@ export function isSupportedFilename(name) {
 // The library's LoaderStatus enum isn't exported; these are its wire values.
 const LOADER_PHASE = { 0: 'Downloading', 1: 'Processing', 2: 'Done' };
 
+// Every iPhone/iPad browser is WebKit (iPadOS reports itself as a Mac with
+// touch). WebKit's SharedArrayBuffer-in-worker path is the classic cause of
+// splat loads hanging after download on iOS, and the library only guards
+// against it on iOS < 16 — so keep the zero-copy sort path desktop-only.
+// Sorting our ~70k-splat scenes through copied memory is still trivially fast.
+const IS_IOS_WEBKIT = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 function isAbortError(err) {
   if (!err) return false;
   return /abort/i.test(err.name || '') || /abort/i.test(err.message || '');
@@ -124,8 +132,9 @@ export class MirageViewer {
       ignoreDevicePixelRatio: quality?.ignoreDevicePixelRatio ?? false,
       webXRMode: GaussianSplats3D.WebXRMode[webXRMode] ?? GaussianSplats3D.WebXRMode.None,
       // SharedArrayBuffer needs cross-origin isolation (COOP/COEP). Fall back
-      // to copying memory into the sort worker when the host doesn't send them.
-      sharedMemoryForWorkers: window.crossOriginIsolated === true,
+      // to copying memory into the sort worker when the host doesn't send
+      // them — and never use it on iOS WebKit (see IS_IOS_WEBKIT).
+      sharedMemoryForWorkers: window.crossOriginIsolated === true && !IS_IOS_WEBKIT,
       logLevel: GaussianSplats3D.LogLevel.None,
     });
     this._observeResize();
