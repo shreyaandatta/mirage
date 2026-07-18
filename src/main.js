@@ -7,6 +7,7 @@ import { Hud, ICONS } from './ui/hud.js';
 import { toast } from './ui/toast.js';
 import { SceneRecorder, recordingSupported } from './ui/recorder.js';
 import { openPhotoConverter } from './ui/photoModal.js';
+import { openCameraCapture } from './ui/cameraCapture.js';
 import { CameraPath, playPath } from './cameraPath.js';
 import { PathPanel } from './ui/pathPanel.js';
 import { openCaptureGuide } from './ui/guide.js';
@@ -151,6 +152,7 @@ function showGallery() {
     onOpenScene: (scene) => { location.hash = `#/scene/${scene.id}`; },
     onOpenFile: openLocalFile,
     onConvertPhotos: openPhotoConverter,
+    onCaptureLive: openCameraCapture,
     onOpenGuide: openCaptureGuide,
     onStartTour: startTour,
   });

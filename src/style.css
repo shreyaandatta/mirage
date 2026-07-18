@@ -1231,6 +1231,86 @@ input[type='range'] {
 
 .modal-actions:empty { margin-top: 0; }
 
+/* Live camera capture */
+
+.cam-modal { width: min(560px, 94vw); }
+/* our display:flex rules would otherwise override the [hidden] attribute */
+.cam-modal [hidden] { display: none !important; }
+
+.cam-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-strong);
+}
+.cam-seg-btn {
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cam-seg-btn.active { background: var(--accent); color: #fff; }
+.cam-seg-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.cam-view {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  max-height: 52vh;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #05050a;
+  border: 1px solid var(--border-strong);
+}
+.cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;            /* rear camera: no mirror — preview matches reality */
+}
+.cam-rec-dot {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
+  animation: cam-pulse 1s ease-in-out infinite;
+}
+@keyframes cam-pulse { 50% { opacity: 0.35; } }
+.cam-tip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), transparent);
+}
+
+.cam-controls { margin-top: 14px; }
+.cam-ctl-photos, .cam-ctl-video { display: flex; align-items: center; gap: 10px; }
+.cam-count, .cam-timer {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+.cam-auto.active { border-color: var(--accent-bright); color: var(--accent-bright); }
+.cam-rec.recording { background: #ef4444; }
+.cam-rec.recording:hover { background: #dc2626; }
+.cam-modal .modal-status { margin-top: 12px; }
+
 /* Guided tour */
 
 .tour-replay {

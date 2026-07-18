@@ -5,6 +5,7 @@ import { placeholderReference } from './ui/compareSlider.js';
 import { WebglHero } from './ui/webglHero.js';
 import { smoothScrollActive, smoothScrollTo } from './smoothScroll.js';
 import { librarySupported, listScenes, deleteScene } from './sceneLibrary.js';
+import { cameraCaptureSupported } from './ui/cameraCapture.js';
 
 // Bundled sample scenes. These are procedurally generated .splat files
 // (see scripts/generate-scenes.mjs) so the repo stays small and the demo
@@ -53,13 +54,14 @@ export const SCENES = [
 
 const UPLOAD_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>`;
 const PHOTO_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`;
+const CAMERA_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
 
 /**
  * Render the landing gallery into `container`.
  * @param {HTMLElement} container
  * @param {object} handlers { onOpenScene(scene), onOpenFile(file) }
  */
-export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPhotos, onOpenGuide, onStartTour }) {
+export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPhotos, onCaptureLive, onOpenGuide, onStartTour }) {
   container.innerHTML = `
     <div class="gallery">
       <div class="hero-mount"></div>
@@ -93,6 +95,18 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
           <button class="btn primary" id="pick-file">Choose file</button>
           <input type="file" id="file-input" accept=".ply,.splat,.ksplat,.spz" hidden />
         </div>
+
+        ${cameraCaptureSupported() ? `
+        <div class="section-label" style="margin-top:40px">Capture live</div>
+        <div class="dropzone" data-tour="camera">
+          <div class="dz-icon">${CAMERA_ICON}</div>
+          <div class="dz-text">
+            <strong>On your phone? Shoot your subject right here</strong>
+            <span>Open your camera and snap a burst of photos or record a clip — orbit slowly around the object.
+            Everything stays on your device; download the frames and feed them to the pipeline.</span>
+          </div>
+          <button class="btn primary" id="capture-live">Open camera</button>
+        </div>` : ''}
 
         <div class="section-label" style="margin-top:40px">Capture prep</div>
         <div class="dropzone" data-tour="prep">
@@ -142,6 +156,8 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
     if (photoInput.files?.length) onConvertPhotos(photoInput.files);
     photoInput.value = '';
   });
+
+  container.querySelector('#capture-live')?.addEventListener('click', () => onCaptureLive?.());
 
   container.querySelectorAll('#open-guide, #open-guide-footer').forEach(
     el => el.addEventListener('click', () => onOpenGuide?.()));

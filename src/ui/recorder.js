@@ -25,6 +25,16 @@ export function recordingSupported() {
 }
 
 /**
+ * Best available MediaRecorder container/codec (MP4 where possible, WebM
+ * fallback), or null if recording isn't supported. Shared with the live
+ * camera capture, which records a device MediaStream rather than a canvas.
+ * @returns {{mimeType: string, ext: string}|null}
+ */
+export function pickRecordingFormat() {
+  return pickFormat();
+}
+
+/**
  * Records a canvas element to a video file via MediaRecorder. One recording at
  * a time; the caller drives start/stop and receives a Blob to download.
  */

@@ -25,6 +25,7 @@ Point a phone at an object or a room, run it through a splatting pipeline, and w
 - **Persistent scene library** — every capture you drop in is saved to IndexedDB and gets its own `#/lib/<id>` URL, so your scenes are still there after a reload (with a "Your library" section in the gallery to reopen or remove them). Storage failures fall back gracefully to a session-only open.
 - **Perf diagnostics HUD** (`?hud=1`) — FPS, frame-time median/p95 over a rolling window, live splat count, WebGL draw calls, and JS heap where the browser exposes it.
 - **In-browser `.ply` → `.ksplat` conversion**: drop a raw training output, click convert, and get a compressed file that loads much faster next time.
+- **Live camera capture**: on a phone (or any device with a camera), open the rear camera right in the page and either snap a burst of overlapping frames — downloaded as a zip of JPGs — or record a slow orbit clip (MP4, WebM fallback). It's the on-ramp *into* the reconstruction pipeline: shoot here, feed the frames to COLMAP or a video-capable trainer. Everything stays on-device (getUserMedia + MediaRecorder + canvas frame-grab; no upload, no backend), and it's capability-gated so it only appears where a camera exists.
 - **HEIC → JPG capture prep**: drop your iPhone photos (`.heic`/`.heif`) on the gallery to batch-convert them to `.jpg` and download a zip — the format COLMAP and most splatting trainers actually want. Runs locally via a lazily-loaded libheif WASM decoder.
 
 ## The tech, honestly
@@ -135,6 +136,7 @@ mirage/
     crop.js               AABB splat filter → raw .splat → .ksplat re-export
     convert.js            .ply → .ksplat client-side conversion
     convertImages.js      HEIC → JPG batch conversion (lazy-loaded)
+    ui/cameraCapture.js   live camera capture → JPG burst zip / video clip
     heicDetect.js         dependency-free HEIC detection for drag routing
     urlState.js           compact pose/path encode-decode for shareable links
     ui/                   HUD/toolbar, path + crop panels, compare slider, tour, guide, modals
