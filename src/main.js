@@ -199,15 +199,26 @@ async function showViewer(source, { initialView, initialPath, webXRMode = 'None'
   startStatsLoop();
   overlay.show(source.name);
 
+  // A rejected load is toasted below, but a *hung* load (worker/WASM quirks
+  // on some mobile browsers) would spin forever with no feedback — after a
+  // while, say so on the overlay instead of leaving a silent spinner.
+  let lastPhase = 'Starting';
+  const watchdog = setTimeout(() => {
+    if (token !== navToken) return;
+    overlay.update(undefined, null, `Still working (stuck at ${lastPhase})… a reload sometimes helps`);
+  }, 20000);
+
   try {
     const completed = await mirage.load(source, {
       quality: qualityFromSettings(),
       progressive: settings.progressive,
       webXRMode,
       onProgress: (pct, label, phase) => {
+        lastPhase = phase;
         if (token === navToken) overlay.update(pct, label, phase);
       },
     });
+    clearTimeout(watchdog);
     if (token !== navToken) return;
     overlay.hide();
     if (!completed) return;
@@ -219,6 +230,7 @@ async function showViewer(source, { initialView, initialPath, webXRMode = 'None'
     }
     if (initialView) mirage.setCameraPose(initialView);
   } catch (err) {
+    clearTimeout(watchdog);
     if (token !== navToken) return;
     overlay.hide();
     console.error('Scene load failed:', err);
