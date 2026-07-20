@@ -89,10 +89,11 @@ export function renderGallery(container, { onOpenScene, onOpenFile, onConvertPho
           <div class="dz-text">
             <strong>Drop a splat file anywhere on this page</strong>
             <span>Supports <code>.ply</code> · <code>.splat</code> · <code>.ksplat</code> · <code>.spz</code> —
-            processed entirely in your browser, nothing is uploaded.</span>
+            or a <code>.zip</code> containing one (Luma / Polycam exports).
+            Processed entirely in your browser, nothing is uploaded.</span>
           </div>
           <button class="btn primary" id="pick-file">Choose file</button>
-          <input type="file" id="file-input" accept=".ply,.splat,.ksplat,.spz" hidden />
+          <input type="file" id="file-input" accept=".ply,.splat,.ksplat,.spz,.zip" hidden />
         </div>
 
         ${cameraCaptureSupported() ? `
@@ -322,8 +323,10 @@ export function installDragAndDrop({ onOpenFile, onConvertPhotos, onReject }) {
     if (heics.length) { onConvertPhotos(heics); return; }
 
     const file = files[0];
-    if (!isSupportedFilename(file.name)) {
-      onReject(`"${file.name}" isn't a splat file — try .ply, .splat, .ksplat, or .spz (or drop .heic photos to convert them).`);
+    // Zips route through the opener too — it looks inside for a splat scene
+    // (Luma/Polycam exports) or capture photos and responds accordingly.
+    if (!isSupportedFilename(file.name) && !/\.zip$/i.test(file.name)) {
+      onReject(`"${file.name}" isn't a splat file — try .ply, .splat, .ksplat, .spz, or a .zip containing one (or drop .heic photos to convert them).`);
       return;
     }
     onOpenFile(file);

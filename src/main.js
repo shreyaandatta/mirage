@@ -16,6 +16,7 @@ import { CropPanel } from './ui/cropPanel.js';
 import { cropSplats, downloadCroppedKSplat } from './crop.js';
 import { parseHash, buildHash, encodePose, decodePose } from './urlState.js';
 import { librarySupported, saveScene, getScene } from './sceneLibrary.js';
+import { ingestZip, looksLikeZip } from './zipIngest.js';
 import { initSmoothScroll, pauseSmoothScroll, resumeSmoothScroll } from './smoothScroll.js';
 import { RollingWindow } from './perfStats.js';
 import { PerfHud, perfHudEnabled } from './ui/perfHud.js';
@@ -253,6 +254,7 @@ function friendlyLoadError(err) {
 // ---------- Actions ----------
 
 async function openLocalFile(file) {
+  if (looksLikeZip(file.name)) return openZipFile(file);
   const format = formatForFilename(file.name);
   if (format === undefined) {
     toast(`"${file.name}" isn't a supported format — try .ply, .splat, .ksplat, or .spz.`, 'error');
@@ -278,6 +280,36 @@ async function openLocalFile(file) {
   localUrl = URL.createObjectURL(file);
   location.hash = '#/local';
   showViewer(localFileSource(file.name, localUrl, format));
+}
+
+/**
+ * A dropped zip either wraps a splat scene (extract and open it) or holds
+ * capture photos — which are pipeline *input*, not a viewable scene; the
+ * browser can't reconstruct, so point at the guide instead of failing.
+ */
+async function openZipFile(file) {
+  toast(`Reading "${file.name}"…`, 'info', 2500);
+  try {
+    const found = await ingestZip(file);
+    if (found.kind === 'splat') {
+      toast(`Found ${found.file.name} inside the zip.`, 'success');
+      return openLocalFile(found.file); // re-enters the normal save-and-open flow
+    }
+    if (found.kind === 'photos') {
+      toast(
+        `That zip holds ${found.count} capture photos — the raw material for a scene, not a scene yet. ` +
+        'Run them through reconstruction (COLMAP → splat training), then drop the resulting .ply/.splat here.',
+        'info',
+        10000,
+      );
+      openCaptureGuide();
+      return;
+    }
+    toast('No splat file (.ply / .splat / .ksplat / .spz) found inside that zip.', 'error');
+  } catch (err) {
+    console.error('Zip read failed:', err);
+    toast(`Couldn't read "${file.name}" — ${err?.message ?? 'not a valid zip'}.`, 'error');
+  }
 }
 
 function localFileSource(fileName, url, format) {

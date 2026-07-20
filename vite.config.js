@@ -12,8 +12,10 @@ const crossOriginIsolationHeaders = {
 export default defineConfig({
   // For GitHub Pages set base to '/<repo-name>/'. Vercel serves from root.
   base: '/',
-  server: { headers: crossOriginIsolationHeaders },
-  preview: { headers: crossOriginIsolationHeaders },
+  // Honor an externally assigned port (e.g. the harness's PORT env) so the
+  // dev server can move when 5173 is taken; falls back to Vite's default.
+  server: { headers: crossOriginIsolationHeaders, port: Number(process.env.PORT) || 5173 },
+  preview: { headers: crossOriginIsolationHeaders, port: Number(process.env.PORT) || 4173 },
   // The HEIC converter (libheif WASM, ~3 MB) is a deliberately code-split,
   // lazy-loaded chunk — it never touches the initial load — so allow it past
   // the default warning threshold.
